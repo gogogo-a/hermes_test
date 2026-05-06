@@ -9,6 +9,7 @@ Router 使用上游包（见 `services/router/requirements.txt`，从 GitHub tag
 - `ZHIPU_API_KEY`：会在适配层同步为 Hermes 使用的 `ZAI_API_KEY` / `GLM_API_KEY`。
 - `BIGMODEL_BASE_URL`：默认 `https://open.bigmodel.cn/api/paas/v4`。
 - `HERMES_NOUS_MODEL`：默认 `glm-4-flash`（可按开放平台可用模型改名）。
+- **`HERMES_ROUTER_MOCK`**：设为 `1` 或 `true` 时跳过 Nous/智谱推理，Router 固定拆分两条子任务，仅用于 **无 Key** 时打通 Kafka / Worker 联调。
 
 ```mermaid
 flowchart LR
