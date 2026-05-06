@@ -105,6 +105,22 @@ def _get_router_agent():  # noqa: ANN202
 
 def plan_subtasks_with_nous(user_message: str) -> List[Dict[str, Any]]:
     """Run one Nous Hermes-Agent turn (no tools) and parse routing JSON."""
+    mock = os.environ.get("HERMES_ROUTER_MOCK", "0").strip().lower()
+    if mock in {"1", "true", "yes"}:
+        q = user_message.strip().replace("\n", " ")[:200]
+        return [
+            {
+                "agent": "agent.copy",
+                "instructions": f"根据需求写一段中文短文案：{q}",
+                "args": {},
+            },
+            {
+                "agent": "agent.research",
+                "instructions": f"列出与该需求相关的核验要点：{q}",
+                "args": {},
+            },
+        ]
+
     agent = _get_router_agent()
     result = agent.run_conversation(user_message.strip())
     if not isinstance(result, dict):
