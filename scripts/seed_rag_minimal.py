@@ -26,9 +26,21 @@ def main() -> None:
 
     readme = root / "README.md"
     if readme.exists():
-        docs.append({"id": "readme", "text": readme.read_text(encoding="utf-8", errors="ignore")})
+        docs.append(
+            {
+                "id": "readme",
+                "markdown": readme.read_text(encoding="utf-8", errors="ignore"),
+                "metadata": {"source": "README.md", "doc_type": "project_doc"},
+            }
+        )
 
-    docs.append({"id": "local_note", "text": texts or "Hermes Kafka 流水线：路由把需求拆为多子任务并由 worker 异步执行。"})
+    docs.append(
+        {
+            "id": "local_note",
+            "markdown": texts or "Hermes Kafka 流水线：路由把需求拆为多子任务并由 worker 异步执行。",
+            "metadata": {"source": "seed", "doc_type": "note"},
+        }
+    )
 
     req = urllib.request.Request(
         f"{rag.rstrip('/')}/internal/ingest",

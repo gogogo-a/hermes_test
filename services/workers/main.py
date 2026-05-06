@@ -56,11 +56,37 @@ def handle_rag(task: Dict[str, Any]) -> Dict[str, Any]:
     return {"status": "ok", "artifact": body}
 
 
+def handle_rag_ingest(task: Dict[str, Any]) -> Dict[str, Any]:
+    """Persist Markdown body + JSON metadata via RAG service (Qdrant)."""
+    base = os.environ.get("RAG_URL", "http://127.0.0.1:8090")
+    args = task.get("payload", {}).get("args") or {}
+    doc_id = str(args.get("doc_id") or task.get("task_id") or "doc")
+    md = str(args.get("markdown") or args.get("content") or task.get("payload", {}).get("instructions") or "")
+    meta = args.get("metadata")
+    if meta is None:
+        meta = {}
+    if isinstance(meta, str):
+        meta = json.loads(meta)
+    if not isinstance(meta, dict):
+        meta = {"value": meta}
+    if not md.strip():
+        raise ValueError("rag.ingest requires args.markdown or instructions with content")
+    r = requests.post(
+        f"{base.rstrip('/')}/internal/ingest",
+        json={"documents": [{"id": doc_id, "markdown": md, "metadata": meta}]},
+        timeout=120,
+    )
+    r.raise_for_status()
+    body = r.json()
+    return {"status": "ok", "artifact": body}
+
+
 def registry() -> Dict[str, Handler]:
     return {
         "agent.copy": handle_copy,
         "agent.research": handle_research,
         "rag.retrieve": handle_rag,
+        "rag.ingest": handle_rag_ingest,
     }
 
 

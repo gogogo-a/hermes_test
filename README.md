@@ -57,13 +57,16 @@ Kafka 对外开放端口默认 **`localhost:19092`**。
 
 网关启动前请确保 **`TASK_SCHEMA_PATH`** 可被解析：`contracts/task-envelope.schema.json`（从 `gateway/` 目录运行时主程序会自动尝试上一级目录）。
 
-### 向量库入库（极简脚本）
+### 向量库入库（Markdown + JSON metadata）
 
-确保 RAG 已启动并完成首次模型缓存下载后：
+- 正文：**`markdown`**（兼容旧字段 **`text`**）；元数据：**`metadata`** 为任意 JSON 对象 → 存入 Qdrant **`payload`**，检索时在 **`context[].meta.metadata`** 回传。
+- **`GET /internal/stats`**：点数统计。
 
 ```bash
 source .env && .venv/rag/bin/python scripts/seed_rag_minimal.py
 ```
+
+自测入库与检索：先起 Qdrant + RAG（`:8090`），再 **`.venv/rag/bin/python scripts/test_rag_markdown_save.py`**。
 
 ## 5. Smoke（仅验证网关写入 Kafka inbound）
 
@@ -88,7 +91,8 @@ curl -sS -X POST http://127.0.0.1:8080/api/v1/tasks \
 - **JSON Schema**：`contracts/task-envelope.schema.json`，Go 网关对入站/完整 envelope 做校验。
 - **hop + MAX_HOPS**：超过阈值的生产者写 `TOPIC_TASKS_DLQ`，避免无休止协作。
 - **Router**：[`nous_brain.py`](services/router/nous_brain.py) 挂载 Nous **[hermes-agent](https://github.com/NousResearch/hermes-agent)** 的 `AIAgent`（`enabled_toolsets=[]`，无工具、仅规划 JSON）；模型用 `HERMES_NOUS_MODEL`（默认 `glm-4-flash`）。
-- **RAG rerank**：若 `sentence-transformers`/PyTorch 安装失败，仍会返回向量检索结果但跳过重排。
+- **Workers**：含 `agent.copy` / `agent.research` / **`rag.retrieve`** / **`rag.ingest`**（`args.markdown` + `args.metadata` → `POST /internal/ingest`）。
+- **RAG rerank**：若 `sentence-transformers`/PyTorch 不可用，仍返回向量检索但跳过重排。
 
 ## 7. Topic 前缀
 

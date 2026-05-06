@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import os
-import re
 import uuid
 from typing import Any, Dict, List
 
@@ -23,22 +22,30 @@ def _env(name: str, default: str) -> str:
     return os.environ.get(name, default)
 
 
-def _chunk_text(text: str, max_len: int = 360, overlap: int = 80) -> List[str]:
-    text = re.sub(r"\s+", " ", text).strip()
+def _chunk_markdown(md: str, max_len: int = 720, overlap: int = 120) -> List[str]:
+    """Slice Markdown without squashing newlines (good enough for vector chunks)."""
+    text = md.strip()
     if not text:
         return []
     chunks: List[str] = []
     i = 0
     while i < len(text):
-        chunk = text[i : i + max_len]
-        chunks.append(chunk)
+        chunks.append(text[i : i + max_len])
         i += max_len - overlap
     return chunks
 
 
 class IngestDoc(BaseModel):
+    """``markdown`` holds the corpus body; ``metadata`` is JSON-compatible and stored on Qdrant payload."""
+
     id: str
-    text: str
+    markdown: str = ""
+    text: str = ""
+    metadata: Dict[str, Any] = Field(default_factory=dict)
+
+    def body(self) -> str:
+        raw = self.markdown.strip() or self.text.strip()
+        return raw
 
 
 class IngestRequest(BaseModel):
@@ -97,22 +104,37 @@ def healthz() -> Dict[str, Any]:
     return {"ok": True, "collection": _collection, "embed_model": _embed_model_name}
 
 
+@app.get("/internal/stats")
+def stats() -> Dict[str, Any]:
+    _ensure_collection()
+    info = _client.get_collection(collection_name=_collection)
+    return {"collection": _collection, "points_count": getattr(info, "points_count", None)}
+
+
 @app.post("/internal/ingest")
 def ingest(req: IngestRequest) -> Dict[str, Any]:
     _ensure_collection()
     points: List[PointStruct] = []
     for doc in req.documents:
-        chunks = _chunk_text(doc.text)
+        body = doc.body()
+        chunks = _chunk_markdown(body)
         if not chunks:
             continue
+        meta = dict(doc.metadata)
         vectors = _embed_texts(chunks)
         for idx, (chunk, vec) in enumerate(zip(chunks, vectors)):
-            pid = str(uuid.uuid5(uuid.NAMESPACE_URL, f"{doc.id}:{idx}"))
+            pid = str(uuid.uuid5(uuid.NAMESPACE_URL, f"{doc.id}:{idx}:{chunk[:96]}"))
             points.append(
                 PointStruct(
                     id=pid,
                     vector=vec,
-                    payload={"doc_id": doc.id, "chunk_index": idx, "text": chunk},
+                    payload={
+                        "doc_id": doc.id,
+                        "chunk_index": idx,
+                        "content_markdown": chunk,
+                        "metadata": meta,
+                        "format": "markdown",
+                    },
                 )
             )
     if points:
@@ -124,22 +146,28 @@ def ingest(req: IngestRequest) -> Dict[str, Any]:
 def query(req: QueryRequest) -> Dict[str, Any]:
     _ensure_collection()
     qvec = _embed_texts([req.query])[0]
-    hits = _client.search(
+    resp = _client.query_points(
         collection_name=_collection,
-        query_vector=qvec,
+        query=qvec,
         limit=req.top_k,
         with_payload=True,
     )
+    hits = resp.points
     docs: List[str] = []
     meta: List[Dict[str, Any]] = []
     for h in hits:
-        text = str(h.payload.get("text", "")) if h.payload else ""
+        pl = h.payload or {}
+        text = str(pl.get("content_markdown") or pl.get("text", ""))
         docs.append(text)
+        raw_meta = pl.get("metadata")
+        chunk_meta = raw_meta if isinstance(raw_meta, dict) else {}
         meta.append(
             {
                 "score": float(h.score),
-                "doc_id": h.payload.get("doc_id") if h.payload else None,
-                "chunk_index": h.payload.get("chunk_index") if h.payload else None,
+                "doc_id": pl.get("doc_id"),
+                "chunk_index": pl.get("chunk_index"),
+                "format": pl.get("format", "markdown"),
+                "metadata": chunk_meta,
             }
         )
 

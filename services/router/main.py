@@ -14,14 +14,22 @@ from hermes_sdk.util import child_envelope, env
 
 from nous_brain import plan_subtasks_with_nous
 
-_ALLOWED_AGENTS = frozenset({"agent.copy", "agent.research", "rag.retrieve"})
+_ALLOWED_AGENTS = frozenset({"agent.copy", "agent.research", "rag.retrieve", "rag.ingest"})
 
 
 def _normalize_agent(name: str) -> str:
     n = name.strip().lower()
     if n in _ALLOWED_AGENTS:
         return n
-    alias = {"copy": "agent.copy", "research": "agent.research", "rag": "rag.retrieve", "rag.retrieve": "rag.retrieve"}
+    alias = {
+        "copy": "agent.copy",
+        "research": "agent.research",
+        "rag": "rag.retrieve",
+        "rag.retrieve": "rag.retrieve",
+        "ingest": "rag.ingest",
+        "rag.ingest": "rag.ingest",
+        "kb_write": "rag.ingest",
+    }
     return alias.get(n, "agent.research")
 
 

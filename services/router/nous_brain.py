@@ -23,9 +23,9 @@ _ROUTER_EPHEMERAL = (
     "你是 Hermes-Agent 范式下的路由主脑，当前任务只做「拆分下游子任务」，不调用工具。\n"
     "约束：回复必须是 **唯一一段合法 JSON 对象**，不要 Markdown、不要用代码围栏、不要追加解释。\n"
     "Schema 严格如下：\n"
-    '{"subtasks":[{"agent":"agent.copy|agent.research|rag.retrieve","instructions":"string","args":{} }]}\n'
-    "至少 2 个子任务。需要查知识时用 rag.retrieve，并在 args 里给 {\"query\": \"...\"}。\n"
-    "agent 只允许上述三个字面量之一。"
+    '{"subtasks":[{"agent":"agent.copy|agent.research|rag.retrieve|rag.ingest","instructions":"string","args":{} }]}\n'
+    "至少 2 个子任务。检索用 rag.retrieve（args.query）；写入知识库用 rag.ingest（args.markdown + args.metadata JSON 对象）。\n"
+    "agent 只允许上述字面值之一。"
 )
 
 
