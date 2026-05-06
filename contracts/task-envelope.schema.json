@@ -1,0 +1,64 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hermes.local/schemas/task-envelope.json",
+  "title": "TaskEnvelope",
+  "description": "Single canonical message exchanged across gateway, router, agents, and DLQ.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "task_id",
+    "correlation_id",
+    "agent",
+    "schema_version",
+    "hop",
+    "payload"
+  ],
+  "properties": {
+    "task_id": {
+      "type": "string",
+      "minLength": 8
+    },
+    "correlation_id": {
+      "type": "string",
+      "minLength": 8
+    },
+    "parent_task_id": {
+      "type": ["string", "null"]
+    },
+    "trace": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "agent": {
+      "type": "string",
+      "pattern": "^[a-z0-9._-]+$",
+      "examples": ["inbound", "router", "agent.copy", "agent.research", "rag.retrieve"]
+    },
+    "schema_version": {
+      "type": "string",
+      "const": "1"
+    },
+    "hop": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 32
+    },
+    "iteration": {
+      "type": "integer",
+      "minimum": 0,
+      "default": 0
+    },
+    "ttl_unix": {
+      "type": ["integer", "null"],
+      "description": "Optional epoch seconds when this workflow should halt."
+    },
+    "next_agent": {
+      "type": ["string", "null"],
+      "description": "Optional explicit routing hint for orchestration."
+    },
+    "payload": {
+      "type": "object",
+      "additionalProperties": true
+    }
+  }
+}
