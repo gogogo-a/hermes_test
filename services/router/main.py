@@ -12,6 +12,8 @@ load_dotenv()
 
 from hermes_sdk.util import child_envelope, env
 
+from nous_brain import plan_subtasks_with_nous
+
 _ALLOWED_AGENTS = frozenset({"agent.copy", "agent.research", "rag.retrieve"})
 
 
@@ -60,34 +62,6 @@ def _consumer() -> KafkaConsumer:
     )
 
 
-def _plan_with_glm(user_message: str) -> List[Dict[str, Any]]:
-    from zhipuai import ZhipuAI
-
-    client = ZhipuAI(api_key=env("ZHIPU_API_KEY"))
-    system = (
-        "你是 Hermes 风格的路由主控。只输出 JSON，不要 Markdown。"
-        "Schema: {\"subtasks\":[{\"agent\":\"agent.copy|agent.research|rag.retrieve\","
-        "\"instructions\":string,\"args\":object}]}. "
-        "至少产生 2 个子任务。args 可选；若需知识检索，用 rag.retrieve 并给出 query。"
-    )
-    user = f"用户输入：{user_message}"
-    resp = client.chat.completions.create(
-        model=os.environ.get("ZHIPU_ROUTER_MODEL", "glm-4-flash"),
-        messages=[
-            {"role": "system", "content": system},
-            {"role": "user", "content": user},
-        ],
-        temperature=0.2,
-        response_format={"type": "json_object"},
-    )
-    content = resp.choices[0].message.content
-    data = json.loads(content)
-    tasks = data.get("subtasks") or []
-    if not isinstance(tasks, list) or len(tasks) < 1:
-        raise ValueError("router returned no subtasks")
-    return tasks
-
-
 def run() -> None:
     max_hops = int(os.environ.get("MAX_HOPS", "5"))
     topic_dispatch = env("TOPIC_TASKS_DISPATCH", "hermes.tasks.dispatch")
@@ -114,7 +88,7 @@ def run() -> None:
             continue
 
         try:
-            subtasks = _ensure_min_subtasks(user_message, _plan_with_glm(user_message))
+            subtasks = _ensure_min_subtasks(user_message, plan_subtasks_with_nous(user_message))
         except Exception as exc:  # noqa: BLE001
             dlq = child_envelope(
                 parent,

@@ -11,6 +11,9 @@ __pycache__/
 *.py[cod]
 .venv/
 venv/
+
+# Local state for vendored-style Nous Hermes-Agent routing process
+.hermes_nous_home/
 *.egg-info/
 .pytest_cache/
 .mypy_cache/

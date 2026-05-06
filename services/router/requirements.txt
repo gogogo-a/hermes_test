@@ -1,4 +1,4 @@
-zhipuai>=2.1.5
+# NousResearch Hermes Agent (Git — not on PyPI). Pin tag for reproducible installs.
+hermes-agent @ git+https://github.com/NousResearch/hermes-agent.git@v2026.4.30
 kafka-python>=2.0.2
 python-dotenv>=1.0.1
-jsonschema>=4.22.0

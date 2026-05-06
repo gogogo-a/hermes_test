@@ -1,6 +1,14 @@
 # Hermes · Kafka · 智谱多 Agent（Go + Python）
 
-企业级样式的最小可运行骨架：**Go 网关**（Harness + JSON Schema + Kafka Produce）→ **Kafka（Redpanda）** → **Python Router（智谱 GLM 结构化拆分）→ 多条 **dispatch** 事件被 **workers**（`agent.copy` / `agent.research` / `rag.retrieve`）消费并把结果发到 **results**。**RAG** 使用 FastEmbed + Qdrant，并用 Cross‑Encoder rerank Top‑K（sentence‑transformers 可选加载）。
+企业级样式的最小可运行骨架：**Go 网关**（Harness + JSON Schema + Kafka Produce）→ **Kafka（Redpanda）** → **Router（[Nous Hermes‑Agent](https://github.com/NousResearch/hermes-agent) 的 `AIAgent`，模型走智谱 OpenAI‑compat + `glm-*`）** 消费 **inbound** 并拆分 → 多条 **dispatch** 事件被 **workers**（`agent.copy` / `agent.research` / `rag.retrieve`）消费并把结果发到 **results**。**RAG** 使用 FastEmbed + Qdrant，并用 Cross‑Encoder rerank Top‑K（sentence‑transformers 可选加载）。
+
+Router 使用上游包（见 `services/router/requirements.txt`，从 GitHub tag 钉死版本）；本地状态目录 **`.hermes_nous_home/`**（已 gitignore：`HERMES_HOME`）用于会话/缓存隔离。
+
+### Router 与环境变量（智谱）
+
+- `ZHIPU_API_KEY`：会在适配层同步为 Hermes 使用的 `ZAI_API_KEY` / `GLM_API_KEY`。
+- `BIGMODEL_BASE_URL`：默认 `https://open.bigmodel.cn/api/paas/v4`。
+- `HERMES_NOUS_MODEL`：默认 `glm-4-flash`（可按开放平台可用模型改名）。
 
 ```mermaid
 flowchart LR
@@ -17,7 +25,7 @@ flowchart LR
 ## 1. 准备
 
 1. Docker Desktop / Docker Engine。
-2. Go ≥ 1.22、Python ≥ 3.11。
+2. Go ≥ 1.22、**Python ≥ 3.11**（Nous `hermes-agent` 硬性要求；Router venv 不可用系统自带的 3.10）。
 3. 智谱开放平台 API Key：**若曾泄露请先轮换**。仅写入根目录 `.env`（永远不要提交）。
 4. 复制环境变量：`cp .env.example .env` 后填写 `ZHIPU_API_KEY`。
 
@@ -78,7 +86,7 @@ curl -sS -X POST http://127.0.0.1:8080/api/v1/tasks \
 
 - **JSON Schema**：`contracts/task-envelope.schema.json`，Go 网关对入站/完整 envelope 做校验。
 - **hop + MAX_HOPS**：超过阈值的生产者写 `TOPIC_TASKS_DLQ`，避免无休止协作。
-- **Router**：`_plan_with_glm` 产出 `agent.copy` · `agent.research` · `rag.retrieve`，模型名可用 `ZHIPU_ROUTER_MODEL` 覆盖（默认 `glm-4-flash`）。
+- **Router**：[`nous_brain.py`](services/router/nous_brain.py) 挂载 Nous **[hermes-agent](https://github.com/NousResearch/hermes-agent)** 的 `AIAgent`（`enabled_toolsets=[]`，无工具、仅规划 JSON）；模型用 `HERMES_NOUS_MODEL`（默认 `glm-4-flash`）。
 - **RAG rerank**：若 `sentence-transformers`/PyTorch 安装失败，仍会返回向量检索结果但跳过重排。
 
 ## 7. Topic 前缀
